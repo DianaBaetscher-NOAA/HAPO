@@ -1,0 +1,244 @@
+(cutadaptenv) AKCJM140-DB23:HAPO_test diana.baetscher$ for i in ${NAMELIST}; do
+>    cutadapt --discard-untrimmed -g TACTCCTTGAAAAAGCCCATTGTA -G ATGGTCCTGAAGTAAGAACCAGATG -o trimmed/${i}_R1.fastq.gz -p trimmed/${i}_R2.fastq.gz "$DATA/${i}_L001_R1_001.fastq.gz" "$DATA/${i}_L001_R2_001.fastq.gz";
+> done
+This is cutadapt 4.6 with Python 3.10.13
+Command line parameters: --discard-untrimmed -g TACTCCTTGAAAAAGCCCATTGTA -G ATGGTCCTGAAGTAAGAACCAGATG -o trimmed/AukeBayTest1_S193_R1.fastq.gz -p trimmed/AukeBayTest1_S193_R2.fastq.gz /Users/diana.baetscher/Desktop/HAPO_test/rawdata/AukeBayTest1_S193_L001_R1_001.fastq.gz /Users/diana.baetscher/Desktop/HAPO_test/rawdata/AukeBayTest1_S193_L001_R2_001.fastq.gz
+Processing paired-end reads on 1 core ...
+Done           00:00:00         1,105 reads @  19.7 µs/read;   3.04 M reads/minute
+Finished in 0.025 s (22.283 µs/read; 2.69 M reads/minute).
+
+=== Summary ===
+
+Total read pairs processed:              1,105
+  Read 1 with adapter:                   1,102 (99.7%)
+  Read 2 with adapter:                   1,103 (99.8%)
+
+== Read fate breakdown ==
+Pairs discarded as untrimmed:                5 (0.5%)
+Pairs written (passing filters):         1,100 (99.5%)
+
+Total basepairs processed:       167,635 bp
+  Read 1:        83,966 bp
+  Read 2:        83,669 bp
+Total written (filtered):        113,081 bp (67.5%)
+  Read 1:        57,196 bp
+  Read 2:        55,885 bp
+
+=== First read: Adapter 1 ===
+
+Sequence: TACTCCTTGAAAAAGCCCATTGTA; Type: regular 5'; Length: 24; Trimmed: 1102 times
+
+Minimum overlap: 3
+No. of allowed errors:
+1-9 bp: 0; 10-19 bp: 1; 20-24 bp: 2
+
+Overview of removed sequences
+length	count	expect	max.err	error counts
+21	1	0.0	2	0 1
+23	6	0.0	2	0 5 1
+24	1095	0.0	2	937 142 16
+
+
+=== Second read: Adapter 2 ===
+
+Sequence: ATGGTCCTGAAGTAAGAACCAGATG; Type: regular 5'; Length: 25; Trimmed: 1103 times
+
+Minimum overlap: 3
+No. of allowed errors:
+1-9 bp: 0; 10-19 bp: 1; 20-25 bp: 2
+
+Overview of removed sequences
+length	count	expect	max.err	error counts
+3	4	17.3	0	4
+24	7	0.0	2	0 7
+25	1088	0.0	2	1065 18 5
+26	4	0.0	2	0 4
+This is cutadapt 4.6 with Python 3.10.13
+Command line parameters: --discard-untrimmed -g TACTCCTTGAAAAAGCCCATTGTA -G ATGGTCCTGAAGTAAGAACCAGATG -o trimmed/AukeBayTest2_S194_R1.fastq.gz -p trimmed/AukeBayTest2_S194_R2.fastq.gz /Users/diana.baetscher/Desktop/HAPO_test/rawdata/AukeBayTest2_S194_L001_R1_001.fastq.gz /Users/diana.baetscher/Desktop/HAPO_test/rawdata/AukeBayTest2_S194_L001_R2_001.fastq.gz
+Processing paired-end reads on 1 core ...
+Done           00:00:00         5,360 reads @  14.3 µs/read;   4.21 M reads/minute
+Finished in 0.080 s (14.959 µs/read; 4.01 M reads/minute).
+
+=== Summary ===
+
+Total read pairs processed:              5,360
+  Read 1 with adapter:                   5,321 (99.3%)
+  Read 2 with adapter:                   5,323 (99.3%)
+
+== Read fate breakdown ==
+Pairs discarded as untrimmed:               59 (1.1%)
+Pairs written (passing filters):         5,301 (98.9%)
+
+Total basepairs processed:       814,202 bp
+  Read 1:       407,160 bp
+  Read 2:       407,042 bp
+Total written (filtered):        545,875 bp (67.0%)
+  Read 1:       275,511 bp
+  Read 2:       270,364 bp
+
+=== First read: Adapter 1 ===
+
+Sequence: TACTCCTTGAAAAAGCCCATTGTA; Type: regular 5'; Length: 24; Trimmed: 5321 times
+
+Minimum overlap: 3
+No. of allowed errors:
+1-9 bp: 0; 10-19 bp: 1; 20-24 bp: 2
+
+Overview of removed sequences
+length	count	expect	max.err	error counts
+22	1	0.0	2	0 0 1
+23	52	0.0	2	4 45 3
+24	5252	0.0	2	4776 450 26
+25	16	0.0	2	2 13 1
+
+
+=== Second read: Adapter 2 ===
+
+Sequence: ATGGTCCTGAAGTAAGAACCAGATG; Type: regular 5'; Length: 25; Trimmed: 5323 times
+
+Minimum overlap: 3
+No. of allowed errors:
+1-9 bp: 0; 10-19 bp: 1; 20-25 bp: 2
+
+Overview of removed sequences
+length	count	expect	max.err	error counts
+3	15	83.8	0	15
+23	1	0.0	2	0 0 1
+24	33	0.0	2	1 32
+25	5260	0.0	2	5180 69 11
+26	14	0.0	2	2 12
+This is cutadapt 4.6 with Python 3.10.13
+Command line parameters: --discard-untrimmed -g TACTCCTTGAAAAAGCCCATTGTA -G ATGGTCCTGAAGTAAGAACCAGATG -o trimmed/AukeBayTest3_S195_R1.fastq.gz -p trimmed/AukeBayTest3_S195_R2.fastq.gz /Users/diana.baetscher/Desktop/HAPO_test/rawdata/AukeBayTest3_S195_L001_R1_001.fastq.gz /Users/diana.baetscher/Desktop/HAPO_test/rawdata/AukeBayTest3_S195_L001_R2_001.fastq.gz
+Processing paired-end reads on 1 core ...
+Done           00:00:00         2,460 reads @  16.3 µs/read;   3.69 M reads/minute
+Finished in 0.043 s (17.627 µs/read; 3.40 M reads/minute).
+
+=== Summary ===
+
+Total read pairs processed:              2,460
+  Read 1 with adapter:                   2,445 (99.4%)
+  Read 2 with adapter:                   2,436 (99.0%)
+
+== Read fate breakdown ==
+Pairs discarded as untrimmed:               32 (1.3%)
+Pairs written (passing filters):         2,428 (98.7%)
+
+Total basepairs processed:       372,490 bp
+  Read 1:       186,603 bp
+  Read 2:       185,887 bp
+Total written (filtered):        248,802 bp (66.8%)
+  Read 1:       125,918 bp
+  Read 2:       122,884 bp
+
+=== First read: Adapter 1 ===
+
+Sequence: TACTCCTTGAAAAAGCCCATTGTA; Type: regular 5'; Length: 24; Trimmed: 2445 times
+
+Minimum overlap: 3
+No. of allowed errors:
+1-9 bp: 0; 10-19 bp: 1; 20-24 bp: 2
+
+Overview of removed sequences
+length	count	expect	max.err	error counts
+21	2	0.0	2	1 1
+22	1	0.0	2	0 0 1
+23	11	0.0	2	0 10 1
+24	2422	0.0	2	2169 243 10
+25	9	0.0	2	1 8
+
+
+=== Second read: Adapter 2 ===
+
+Sequence: ATGGTCCTGAAGTAAGAACCAGATG; Type: regular 5'; Length: 25; Trimmed: 2436 times
+
+Minimum overlap: 3
+No. of allowed errors:
+1-9 bp: 0; 10-19 bp: 1; 20-25 bp: 2
+
+Overview of removed sequences
+length	count	expect	max.err	error counts
+3	5	38.4	0	5
+24	14	0.0	2	1 13
+25	2410	0.0	2	2369 31 10
+26	7	0.0	2	0 7
+This is cutadapt 4.6 with Python 3.10.13
+Command line parameters: --discard-untrimmed -g TACTCCTTGAAAAAGCCCATTGTA -G ATGGTCCTGAAGTAAGAACCAGATG -o trimmed/ExtractionBlank_S196_R1.fastq.gz -p trimmed/ExtractionBlank_S196_R2.fastq.gz /Users/diana.baetscher/Desktop/HAPO_test/rawdata/ExtractionBlank_S196_L001_R1_001.fastq.gz /Users/diana.baetscher/Desktop/HAPO_test/rawdata/ExtractionBlank_S196_L001_R2_001.fastq.gz
+Processing paired-end reads on 1 core ...
+Done           00:00:00            51 reads @ 147.8 µs/read;   0.41 M reads/minute
+Finished in 0.009 s (180.689 µs/read; 0.33 M reads/minute).
+
+=== Summary ===
+
+Total read pairs processed:                 51
+  Read 1 with adapter:                      43 (84.3%)
+  Read 2 with adapter:                      48 (94.1%)
+
+== Read fate breakdown ==
+Pairs discarded as untrimmed:                8 (15.7%)
+Pairs written (passing filters):            43 (84.3%)
+
+Total basepairs processed:         7,742 bp
+  Read 1:         3,868 bp
+  Read 2:         3,874 bp
+Total written (filtered):          4,427 bp (57.2%)
+  Read 1:         2,235 bp
+  Read 2:         2,192 bp
+
+=== First read: Adapter 1 ===
+
+Sequence: TACTCCTTGAAAAAGCCCATTGTA; Type: regular 5'; Length: 24; Trimmed: 43 times
+
+Minimum overlap: 3
+No. of allowed errors:
+1-9 bp: 0; 10-19 bp: 1; 20-24 bp: 2
+
+Overview of removed sequences
+length	count	expect	max.err	error counts
+23	1	0.0	2	1
+24	42	0.0	2	37 5
+
+
+=== Second read: Adapter 2 ===
+
+Sequence: ATGGTCCTGAAGTAAGAACCAGATG; Type: regular 5'; Length: 25; Trimmed: 48 times
+
+Minimum overlap: 3
+No. of allowed errors:
+1-9 bp: 0; 10-19 bp: 1; 20-25 bp: 2
+
+Overview of removed sequences
+length	count	expect	max.err	error counts
+3	3	0.8	0	3
+24	1	0.0	2	0 0 1
+25	44	0.0	2	42 2
+This is cutadapt 4.6 with Python 3.10.13
+Command line parameters: --discard-untrimmed -g TACTCCTTGAAAAAGCCCATTGTA -G ATGGTCCTGAAGTAAGAACCAGATG -o trimmed/NegativeControl_S197_R1.fastq.gz -p trimmed/NegativeControl_S197_R2.fastq.gz /Users/diana.baetscher/Desktop/HAPO_test/rawdata/NegativeControl_S197_L001_R1_001.fastq.gz /Users/diana.baetscher/Desktop/HAPO_test/rawdata/NegativeControl_S197_L001_R2_001.fastq.gz
+Processing paired-end reads on 1 core ...
+Done           00:00:00             3 reads @ 2440.0 µs/read;   0.02 M reads/minute
+Finished in 0.009 s (2884.388 µs/read; 0.02 M reads/minute).
+
+=== Summary ===
+
+Total read pairs processed:                  3
+  Read 1 with adapter:                       0 (0.0%)
+  Read 2 with adapter:                       0 (0.0%)
+
+== Read fate breakdown ==
+Pairs discarded as untrimmed:                3 (100.0%)
+Pairs written (passing filters):             0 (0.0%)
+
+Total basepairs processed:           454 bp
+  Read 1:           227 bp
+  Read 2:           227 bp
+Total written (filtered):              0 bp (0.0%)
+  Read 1:             0 bp
+  Read 2:             0 bp
+
+=== First read: Adapter 1 ===
+
+Sequence: TACTCCTTGAAAAAGCCCATTGTA; Type: regular 5'; Length: 24; Trimmed: 0 times
+
+=== Second read: Adapter 2 ===
+
+Sequence: ATGGTCCTGAAGTAAGAACCAGATG; Type: regular 5'; Length: 25; Trimmed: 0 times
+(cutadaptenv) AKCJM140-DB23:HAPO_test diana.baetscher$ 

@@ -1,0 +1,201 @@
+---
+title: "dada2"
+author: "diana baetscher"
+date: "2025-08-19"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load-libraries}
+library(dada2)
+library(tidyverse)
+```
+
+```{r}
+# file location
+path <- "../data/HAPO_test/trimmed"
+
+list.files(path)
+```
+
+
+```{r}
+fnFs <- sort(list.files(path, pattern = "_R1.fastq", full.names = TRUE))
+#fnRs <- sort(list.files(path, pattern = "_R2.fastq", full.names = TRUE))
+# Extract sample names, assuming filenames have format: SAMPLENAME_XXX.fastq
+sample.names <- sapply(strsplit(basename(fnFs), "_"), `[`, 1)
+```
+
+```{r}
+plotQualityProfile(fnFs[1:4])
+#plotQualityProfile(fnRs[1:2])
+```
+
+Read1 looks good for the full 76 bp, Read2 looks good for ~50 bp. The data shouldn't overlap because the insert size is ~379 bp.
+Worth processing both reads separately and not merging?
+
+
+
+```{r}
+# Place filtered files in filtered/ subdirectory
+filtFs <- file.path(path, "filtered", paste0(sample.names, "_F_filt.fastq.gz"))
+#filtRs <- file.path(path, "filtered", paste0(sample.names, "_R_filt.fastq.gz"))
+names(filtFs) <- sample.names
+#names(filtRs) <- sample.names
+```
+
+
+
+I think I just need to process the Fwd reads
+```{r}
+out <- filterAndTrim(fnFs, filtFs,
+              maxN=0, maxEE=10, truncQ=5, rm.phix=TRUE,
+              compress=TRUE, multithread=TRUE) 
+
+# out <- filterAndTrim(fnFs, filtFs, fnRs, filtRs, truncLen=c(76,50),
+#               maxN=0, maxEE=c(2,4), truncQ=2, rm.phix=TRUE,
+#               compress=TRUE, multithread=TRUE) 
+head(out)
+
+```
+
+Those filters worked decently for now - keeping a majority of the reads.
+
+
+```{r}
+# ensure there are no samples without reads
+# as these don't work in the next steps
+out %>%
+  as.data.frame() %>%
+  filter(reads.out <1)
+
+# filter the matrix to retain samples with >0 reads
+```
+
+Let's move fwd with these for now... and come back if there are other issues.
+
+### Error rates
+```{r}
+my_list <- as.list(filtFs)
+  
+new_list <- my_list[-5]
+
+# fwd error rates
+errF <- learnErrors(new_list, multithread=TRUE)
+
+# reverse error rates
+#errR <- learnErrors(filtRs, multithread=TRUE)
+
+# plot the erors
+p1 <- plotErrors(errF, nominalQ=TRUE)
+#p2 <- plotErrors(errR, nominalQ=TRUE)
+
+p1
+
+```
+
+### Sample inference
+
+```{r}
+filtF <- as.character(new_list) # change the list back to a character vector for the function
+
+# forwards
+dadaFs <- dada(filtF, err=errF, multithread=TRUE)
+
+# reverses
+#dadaRs <- dada(filtRs, err=errR, pool="pseudo", multithread=TRUE)
+
+```
+
+
+Make a sequence table
+```{r}
+seqtab <- makeSequenceTable(dadaFs)
+dim(seqtab)
+```
+
+```{r}
+# Inspect distribution of sequence lengths
+table(nchar(getSequences(seqtab)))
+```
+Let's remove the singletons and off-target sequences
+```{r}
+seqtab2 <- seqtab[,nchar(colnames(seqtab)) %in% 52]
+```
+
+Remove chimeras
+```{r}
+seqtab.nochim <- removeBimeraDenovo(seqtab2, method="consensus", multithread=TRUE, verbose=TRUE)
+dim(seqtab.nochim)
+```
+Calculate frequency of chimeras
+```{r}
+sum(seqtab.nochim)/sum(seqtab2)
+
+```
+
+Track reads through the pipeline
+```{r}
+# getN <- function(x) sum(getUniques(x))
+# track <- cbind(out, sapply(dadaFs, getN), sapply(dadaRs, getN), sapply(mergers, getN), rowSums(seqtab.nochim))
+# 
+# colnames(track) <- c("input", "filtered", "denoisedF", "denoisedR", "merged", "nonchim")
+# rownames(track) <- sample.names
+# head(track)
+```
+
+## Export files for taxonomy and samples/ASVs
+
+```{r regseqs-asv-output}
+ #make fasta file with ASVs
+    asv_seqs=colnames(seqtab.nochim)
+    for(i in 1:length(asv_seqs))
+    {
+        write.table(paste(">ASV",i, sep=""),file="csv_outputs/HAPO_test_ASV.csv", append=TRUE, col.names = F, row.names = F, quote=F)
+        write.table(paste(asv_seqs[i], sep=""),file="csv_outputs/HAPO_test_ASV.csv", append=TRUE, col.names = F, row.names = F, quote=F)
+    }
+```
+
+That's the input for the FASTA blastn search.
+
+Goal: change ASV headers to numbered ASVs that correspond to those output in the FASTA file.
+```{r first-for-poolseqs}
+# Make map between brief names and full sequences
+briefToSeq <- colnames(seqtab.nochim)
+names(briefToSeq) <- paste0("ASV", seq(ncol(seqtab.nochim))) # Seq1, Seq2, ...
+# Make new sequence table with brief names
+st.brief <- seqtab.nochim
+colnames(st.brief) <- names(briefToSeq)
+
+# export the pool seq table with brief names:
+write.csv(st.brief, file="csv_outputs/hapo_ASVtable.csv")
+```
+
+
+Quick combine:
+
+```{r}
+as.data.frame(seqtab.nochim) %>%
+  rownames_to_column(var = "sample") %>%
+  pivot_longer(2:20, names_to = "ASV", values_to = "reads") %>%
+  filter(reads > 0) %>%
+  arrange(-reads) %>%
+  write_csv("csv_outputs/AukeRec_hapo_df.csv")
+```
+
+
+```{r total-reads-across-samples}
+as.data.frame(seqtab.nochim) %>%
+  rownames_to_column(var = "sample") %>%
+  pivot_longer(2:20, names_to = "ASV", values_to = "reads") %>%
+  filter(reads > 0) %>%
+  arrange(-reads) %>%
+  filter(sample != "ExtractionBlank_F_filt.fastq.gz") %>%
+  group_by(ASV) %>%
+  summarise(total_reads = sum(reads)) %>%
+  arrange(-total_reads)
+```
+
