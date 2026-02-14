@@ -1,0 +1,82 @@
+---
+title: "micro-kit-investigations"
+author: "diana baetscher"
+date: "2026-02-07"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Trying to figure out what's going on with primer binding and barcoding
+
+Read in output from blastn and taxonkit to see what we're amplifying with the microkit reads.
+
+
+```{r}
+library(tidyverse)
+
+
+```
+
+```{r read-in-data-from-taxonkit}
+fwd <- read_tsv("../data/blast_outputs/blastn_taxlineage_hapo_fwd.txt", col_names = F) %>%
+  mutate(primer = "fwd")
+
+rev <- read_tsv("../data/blast_outputs/blastn_taxlineage_hapo_rev.txt", col_names = F) %>%
+  mutate(primer = "rev")
+
+```
+
+```{r}
+tax_df <- bind_rows(fwd, rev) %>%
+  select(X17, primer, X1, X3) %>%
+  rename(taxonomy = X17, asv = X1, perc_id = X3) %>%
+  separate(taxonomy, into = c("n", "phylum", "class", "order", "family", "genus", "species")) %>%
+  select(-n) %>%
+  unique()
+
+tax_df %>%
+  filter(species != "Phocoena")
+
+```
+
+```{r read-in-sample-table}
+fwd_samples <- read_csv("csv_outputs/microkit_fwd_sampleTable.csv")
+
+sample_tbl <- fwd_samples %>%
+  rename(sample = `...1`) %>%
+  pivot_longer(2:length(fwd_samples), names_to = "asv", values_to = "reads") %>%
+  filter(reads > 0)
+  
+```
+
+```{r}
+sample_tbl %>%
+  group_by(sample) %>%
+  summarise(tot_reads = sum(reads)) %>%
+  #filter(tot_reads > 100) %>%
+  ggplot(aes(x = tot_reads)) +
+  geom_histogram(binwidth = 5)
+
+
+```
+
+
+
+```{r}
+# just including the fwd seqs here
+sample_tbl %>%
+ # left_join(., tax_df, by = "asv") %>%
+  filter(reads > 10) %>%
+  ggplot(aes(x = sample, y = reads, fill = asv)) +
+  geom_bar(stat = "identity") +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 90, size = 7)
+  )
+
+ggsave("pdf_outputs/microkit_fwd_quicklook.png", width = 10, height = 5)
+```
+

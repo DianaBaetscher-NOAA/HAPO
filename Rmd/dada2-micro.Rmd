@@ -1,26 +1,47 @@
 ---
-title: "dada2"
+title: "dada2_micro"
 author: "diana baetscher"
-date: "2025-08-19"
-output: github_document
+date: "2026-01-26"
+output: html_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+Checking the data output from a microkit that had poor MiSeq performance (~90% aligned to PhiX).
+These are single-end 300 bp reads, so we have to deal with the FWD and REV reads individually.
+
+UPDATE: the forward primer files were empty. I checked the reverses primer files in geneious and they contained sequence data, so we'll try using those.
+
+```{sh, eval=F}
+# cutadapt remove primers
+# single-end, unsure of which side we're sequencing... begin with the forward primer:
+for i in ${NAMELIST}; do
+	cutadapt --discard-untrimmed -a TACTCCTTGAAAAAGCCCATTGTA -o trimmed/${i}_R1.fastq.gz "$DATA/${i}_L001_R1_001.fastq.gz"
+
+
+# single-end, here's the reverse primer:
+for i in ${NAMELIST}; do
+	cutadapt --discard-untrimmed -a ATGGTCCTGAAGTAAGAACCAGATG -o trimmed2/${i}_R1.fastq.gz "$DATA/${i}_L001_R1_001.fastq.gz"
+
+# then unzip 
+pigz -d *gz
+```
+
+
 ```{r load-libraries}
 library(dada2)
 library(tidyverse)
 ```
-
+I moved all the files that are not completely empty to this new directory.
 ```{r}
 # file location
-path <- "../data/HAPO_test/trimmed"
+path <- "../data/20260122_HAPOeDNA/trimmed2"
+# this is the directory containing the reverse-trimmed sequences
 
 list.files(path)
 ```
-
 
 ```{r}
 fnFs <- sort(list.files(path, pattern = "_R1.fastq", full.names = TRUE))
@@ -30,14 +51,10 @@ sample.names <- sapply(strsplit(basename(fnFs), "_"), `[`, 1)
 ```
 
 ```{r}
-plotQualityProfile(fnFs[1:4])
+plotQualityProfile(fnFs[1:6])
 #plotQualityProfile(fnRs[1:2])
 ```
-
-Read1 looks good for the full 76 bp, Read2 looks good for ~50 bp. The data shouldn't overlap because the insert size is ~379 bp.
-Worth processing both reads separately and not merging?
-
-
+Let's chop all of those off at 200 bp.
 
 ```{r}
 # Place filtered files in filtered/ subdirectory
@@ -48,12 +65,11 @@ names(filtFs) <- sample.names
 ```
 
 
-
 I think I just need to process the Fwd reads
 ```{r}
-out <- filterAndTrim(fnFs, filtFs, truncLen = 53,
-              maxN=0, truncQ=2, rm.phix=TRUE,
-              compress=TRUE, multithread=TRUE) 
+out <- filterAndTrim(fnFs, filtFs, truncLen = 200, #note, reads shorter than truncLen are discarded
+              maxN=0, truncQ=2, rm.phix=TRUE, 
+              compress=TRUE, multithread=TRUE, verbose = TRUE) 
 
 # out <- filterAndTrim(fnFs, filtFs, fnRs, filtRs, truncLen=c(76,50),
 #               maxN=0, maxEE=c(2,4), truncQ=2, rm.phix=TRUE,
@@ -61,8 +77,7 @@ out <- filterAndTrim(fnFs, filtFs, truncLen = 53,
 head(out)
 
 ```
-
-Those filters worked decently for now - keeping a majority of the reads.
+Those filters worked decently for now - keeping a majority of the (small number of) reads.
 
 
 ```{r}
@@ -75,6 +90,9 @@ out %>%
 # filter the matrix to retain samples with >0 reads
 ```
 
+I need to remove those 56 samples from the rest of the analysis.
+
+
 Let's move fwd with these for now... and come back if there are other issues.
 
 ### Error rates
@@ -86,27 +104,20 @@ new_list <- my_list[1:3]
 # fwd error rates
 errF <- learnErrors(new_list, multithread=TRUE)
 
-# reverse error rates
-#errR <- learnErrors(filtRs, multithread=TRUE)
-
 # plot the erors
 p1 <- plotErrors(errF, nominalQ=TRUE)
-#p2 <- plotErrors(errR, nominalQ=TRUE)
 
 p1
 
 ```
 
+
+
 ### Sample inference
 
 ```{r}
-filtF <- as.character(new_list) # change the list back to a character vector for the function
-
 # forwards
-dadaFs <- dada(filtF, err=errF, multithread=TRUE)
-
-# reverses
-#dadaRs <- dada(filtRs, err=errR, pool="pseudo", multithread=TRUE)
+dadaFs <- dada(filtFs, err=errF, multithread=TRUE)
 
 ```
 
@@ -115,6 +126,11 @@ Make a sequence table
 ```{r}
 seqtab <- makeSequenceTable(dadaFs)
 dim(seqtab)
+
+fwd_seqs <- as_data_frame(getSequences(seqtab)) 
+
+fwd_seqs %>%
+  write_csv("csv_outputs/tmp_single_seq.csv")
 ```
 
 ```{r}
@@ -123,7 +139,7 @@ table(nchar(getSequences(seqtab)))
 ```
 Let's remove the singletons and off-target sequences
 ```{r}
-seqtab2 <- seqtab[,nchar(colnames(seqtab)) %in% 53]
+seqtab2 <- seqtab[,nchar(colnames(seqtab)) %in% 200]
 ```
 
 Remove chimeras
@@ -131,21 +147,8 @@ Remove chimeras
 seqtab.nochim <- removeBimeraDenovo(seqtab2, method="consensus", multithread=TRUE, verbose=TRUE)
 dim(seqtab.nochim)
 ```
-Calculate frequency of chimeras
-```{r}
-sum(seqtab.nochim)/sum(seqtab2)
+Zero chimeras identified.
 
-```
-
-Track reads through the pipeline
-```{r}
-# getN <- function(x) sum(getUniques(x))
-# track <- cbind(out, sapply(dadaFs, getN), sapply(dadaRs, getN), sapply(mergers, getN), rowSums(seqtab.nochim))
-# 
-# colnames(track) <- c("input", "filtered", "denoisedF", "denoisedR", "merged", "nonchim")
-# rownames(track) <- sample.names
-# head(track)
-```
 
 ## Export files for taxonomy and samples/ASVs
 
@@ -154,15 +157,25 @@ Track reads through the pipeline
     asv_seqs=colnames(seqtab.nochim)
     for(i in 1:length(asv_seqs))
     {
-        write.table(paste(">ASV",i, sep=""),file="csv_outputs/HAPO_test_ASV_fwd53bp.csv", append=TRUE, col.names = F, row.names = F, quote=F)
-        write.table(paste(asv_seqs[i], sep=""),file="csv_outputs/HAPO_test_ASV_fwd53bp.csv", append=TRUE, col.names = F, row.names = F, quote=F)
+        write.table(paste(">ASV",i, sep=""),file="csv_outputs/HAPO_micro_ASV_rev200bp.csv", append=TRUE, col.names = F, row.names = F, quote=F)
+        write.table(paste(asv_seqs[i], sep=""),file="csv_outputs/HAPO_micro_ASV_rev200bp.csv", append=TRUE, col.names = F, row.names = F, quote=F)
     }
 ```
 
 That's the input for the FASTA blastn search.
 
+
+```{sh, eval=F}
+# then use taxonkit locally to provide full taxonomy for the blast IDs
+# taxonkit is installed locally into the same conda env as cutadapt
+cat blastn_out_hapo_fwd | taxonkit lineage -c -i 14 > blastn_out_hapo_fwd_tax
+taxonkit reformat blastn_out_hapo_fwd_tax -i 16 > blastn_taxlineage_hapo_fwd.txt
+
+```
+
+
 Goal: change ASV headers to numbered ASVs that correspond to those output in the FASTA file.
-```{r first-for-poolseqs}
+```{r output-asv-table}
 # Make map between brief names and full sequences
 briefToSeq <- colnames(seqtab.nochim)
 names(briefToSeq) <- paste0("ASV", seq(ncol(seqtab.nochim))) # Seq1, Seq2, ...
@@ -171,31 +184,6 @@ st.brief <- seqtab.nochim
 colnames(st.brief) <- names(briefToSeq)
 
 # export the pool seq table with brief names:
-write.csv(st.brief, file="csv_outputs/hapo_ASVtable_fwd53bp.csv")
-```
-
-
-Quick combine:
-
-```{r}
-as.data.frame(seqtab.nochim) %>%
-  rownames_to_column(var = "sample") %>%
-  pivot_longer(2:3, names_to = "ASV", values_to = "reads") %>%
-  filter(reads > 0) %>%
-  arrange(-reads) %>%
-  write_csv("csv_outputs/AukeRec_hapo_df_fwd53bp.csv")
-```
-
-
-```{r total-reads-across-samples}
-as.data.frame(seqtab.nochim) %>%
-  rownames_to_column(var = "sample") %>%
-  pivot_longer(2:20, names_to = "ASV", values_to = "reads") %>%
-  filter(reads > 0) %>%
-  arrange(-reads) %>%
-  filter(sample != "ExtractionBlank_F_filt.fastq.gz") %>%
-  group_by(ASV) %>%
-  summarise(total_reads = sum(reads)) %>%
-  arrange(-total_reads)
+write.csv(st.brief, file="csv_outputs/microkit_rev_sampleTable.csv")
 ```
 
