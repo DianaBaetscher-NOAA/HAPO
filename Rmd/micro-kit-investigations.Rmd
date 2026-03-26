@@ -17,7 +17,6 @@ Read in output from blastn and taxonkit to see what we're amplifying with the mi
 ```{r}
 library(tidyverse)
 
-
 ```
 
 ```{r read-in-data-from-taxonkit}
@@ -63,14 +62,38 @@ sample_tbl %>%
 
 ```
 
+```{r}
+# output for jamie
+sample_tbl %>%
+  write_csv("csv_outputs/microkit_sample_asv_quicklook.csv")
+
+```
 
 
 ```{r}
 # just including the fwd seqs here
-sample_tbl %>%
+sample_tbl %>% 
  # left_join(., tax_df, by = "asv") %>%
   filter(reads > 10) %>%
-  ggplot(aes(x = sample, y = reads, fill = asv)) +
+  ggplot(aes(x = reorder(sample, reads), y = reads, fill = asv)) +
+  geom_bar(stat = "identity") +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 90, size = 7)
+  )
+
+ggsave("pdf_outputs/microkit_fwd_quicklook.png", width = 10, height = 5)
+```
+
+
+```{r}
+# just including the fwd seqs here
+sample_tbl %>% 
+ # left_join(., tax_df, by = "asv") %>%
+  filter(reads > 10) %>%
+  group_by(sample) %>%
+  mutate(tot_reads = sum(reads)) %>%
+  ggplot(aes(x = reorder(sample, tot_reads), y = reads, fill = asv)) +
   geom_bar(stat = "identity") +
   theme(
     legend.position = "none",
