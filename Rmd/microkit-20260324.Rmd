@@ -87,7 +87,8 @@ names(filtFs) <- sample.names
 I think I just need to process the Fwd reads
 ```{r}
 # trim reads using the quality scores
-out <- filterAndTrim(fnFs, filtFs, truncLen = 200,
+# 200 worked well, let's try 250 and see what we get
+out <- filterAndTrim(fnFs, filtFs, truncLen = 250,
               maxN=0, truncQ=10, rm.phix=TRUE,
               compress=TRUE, multithread=TRUE) 
 
@@ -169,8 +170,8 @@ We may decide at a later point that the step to remove chimeras actually removes
     asv_seqs=colnames(seqtab.nochim)
     for(i in 1:length(asv_seqs))
     {
-        write.table(paste(">ASV",i, sep=""),file="csv_outputs/HAPO_micro_20260324_ASV_fwd200bp.csv", append=TRUE, col.names = F, row.names = F, quote=F)
-        write.table(paste(asv_seqs[i], sep=""),file="csv_outputs/HAPO_micro_20260324_ASV_fwd200bp.csv", append=TRUE, col.names = F, row.names = F, quote=F)
+        write.table(paste(">ASV",i, sep=""),file="csv_outputs/HAPO_micro_20260324_ASV_fwd250bp.csv", append=TRUE, col.names = F, row.names = F, quote=F)
+        write.table(paste(asv_seqs[i], sep=""),file="csv_outputs/HAPO_micro_20260324_ASV_fwd250bp.csv", append=TRUE, col.names = F, row.names = F, quote=F)
     }
 ```
 
@@ -220,5 +221,31 @@ long_df %>%
   scale_y_continuous(expand = c(0,0))
 
 ggsave("pdf_outputs/microkit_20260324_quicklook.png", width = 10, height = 4)
+```
+
+
+```{r}
+db <- read_csv("../data/Metadata_extraction_db_format.csv")
+
+
+samples <- read_csv("csv_outputs/microkit_samples_20260324.csv")
+
+samples %>%
+  separate(sample, into = c("extraction_ID", "replicate"), remove = F) %>%
+  left_join(., db) %>%
+  filter(reads > 0) %>%
+  mutate(sample_type = ifelse(is.na(sample_type), "positive_control", sample_type)) %>%
+  group_by(sample_type) %>%
+  filter(sample_type %in% c("sample", "positive_control")) %>%
+  ggplot(aes(x = sample, y = reads, fill = ASV)) +
+  geom_bar(stat = "identity") +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 90, size = 6)
+  ) +
+  scale_y_continuous(expand = c(0,0))
+
+  
+  
 ```
 
