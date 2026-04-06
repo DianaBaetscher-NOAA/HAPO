@@ -2,7 +2,7 @@
 title: "micro-kit-investigations"
 author: "diana baetscher"
 date: "2026-02-07"
-output: html_document
+output: github_document
 ---
 
 ```{r setup, include=FALSE}

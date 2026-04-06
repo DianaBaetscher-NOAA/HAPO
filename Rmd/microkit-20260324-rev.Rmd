@@ -1,8 +1,8 @@
 ---
-title: "microkit-20260324"
+title: "microkit-20260324-rev"
 author: "diana baetscher"
-date: "2026-03-26"
-output: github_document
+date: "2026-04-06"
+output: html_document
 ---
 
 ```{r setup, include=FALSE}
@@ -13,9 +13,10 @@ Here I'm analyzing the harbor porpoise data that Jamie generated on a MiSeq sing
 
 There was 60% PhiX aligned, despite using a more stringent gel extraction (>600 bp) and quantifying the libraries using both the Kapa qPCR kit for Illumina and the Qubit.
 
-Based on the last microkit run, I'll start with the forward primers since those contained usable sequence data previously.
+The forward primers are analyzed in `microkit-20260324.Rmd`
 
-The first few steps are outside of R, using cutadapt to trim primers.
+Here, I'll look at the reverse primers to see if those show up.
+
 
 ```{sh, eval = F}
 # preliminaries to get cutadapt going
@@ -33,20 +34,16 @@ echo "${NAMELIST}"
 # cutadapt remove primers
 # single-end, unsure of which side we're sequencing... begin with the forward primer, which has the `-g` for indicating it is the 5' end, not the 3' end:
 for i in ${NAMELIST}; do
-	cutadapt --discard-untrimmed -g TACTCCTTGAAAAAGCCCATTGTA -o trimmed/${i}_R1.fastq.gz "$DATA/${i}_L001_R1_001.fastq.gz" >> cutadapt_fwd_out.txt
+	cutadapt --discard-untrimmed -a ATGGTCCTGAAGTAAGAACCAGATG -o trimmed_rev/${i}_R1.fastq.gz "$DATA/${i}_L001_R1_001.fastq.gz" >> cutadapt_rev_out.txt
 	done
 
 
-# then unzip the reads in the /trimmed directory
+# then unzip the reads in the /trimmed_rev directory
 pigz -d *gz
 ```
 
-There are some empty files - go ahead and move those to a different directory now.
 
-```{sh move-empty-files, eval = F}
-find /Users/diana.baetscher/git-repos/HAPO/data/20260324_HAPOeDNA/trimmed -type f -empty -exec mv {} /Users/diana.baetscher/git-repos/HAPO/data/20260324_HAPOeDNA/trimmed_empty/ \;
-
-```
+~45-50% of reads have the reverse primer sequence. But how? If 99% of reads have the forward primer sequence?
 
 ## Dada2 and ASV analysis
 
@@ -59,7 +56,7 @@ library(tidyverse)
 
 ```{r}
 # file location
-path <- "../data/20260324_HAPOeDNA/trimmed"
+path <- "../data/20260324_HAPOeDNA/trimmed_rev"
 
 list.files(path)
 ```
@@ -75,7 +72,7 @@ sample.names <- sapply(strsplit(basename(fnFs), "_"), `[`, 1)
 plotQualityProfile(fnFs[1:6])
 #plotQualityProfile(fnRs[1:2])
 ```
-Those look much better than the previous run... nice!
+Those all look high-quality.
 
 ```{r}
 # Place filtered files in filtered/ subdirectory
@@ -94,7 +91,9 @@ out <- filterAndTrim(fnFs, filtFs, truncLen = 275,
 
 head(out)
 
-# no empty files at this stage.
+# move around empty files
+# after doing this, I go back up to list the files because the file.list cannot include empty files
+# having commented out this section.
 
 # tmp <- out %>%
 #   as.data.frame() %>%
@@ -105,16 +104,16 @@ head(out)
 #   select(loc)
 # 
 # empty_files <- tmp$loc
-
-# create a directory for files with no reads
-#dir.create("../data/20260122_HAPOeDNA/trimmed/no_reads", showWarnings = FALSE)
-
-# move the files
+# 
+# # create a directory for files with no reads
+# dir.create("../data/20260324_HAPOeDNA/trimmed_rev_empty", showWarnings = FALSE)
+# 
+# # move the files
 # file.rename(empty_files,
-#             file.path("../data/20260122_HAPOeDNA/trimmed/no_reads", basename(empty_files)))
-```
-At a length of 275 bp, we start to have some reads drop out.
+#             file.path("../data/20260324_HAPOeDNA/trimmed_rev_empty", basename(empty_files)))
 
+
+```
 ### Error rates
 ```{r}
 my_list <- as.list(filtFs)
@@ -129,6 +128,7 @@ p1
 
 ```
 
+
 ### Sample inference
 
 ```{r}
@@ -137,7 +137,6 @@ dadaFs <- dada(filtFs, err=errF, multithread=TRUE)
 
 ```
 
-
 Make a sequence table
 ```{r}
 seqtab <- makeSequenceTable(dadaFs)
@@ -145,22 +144,20 @@ dim(seqtab)
 
 as_data_frame(getSequences(seqtab))
 ```
-
-
 ```{r}
 # Inspect distribution of sequence lengths
 table(nchar(getSequences(seqtab)))
 ```
 
-We had 105 sequences at 250 bp and we have 81 sequences at 275 bp. Given that this is preliminary data and we'll get the full haplotype with the 2x300 bp (600 cycle kit), I'll continue on with 275 bp.
 
-
+All sequences were trimmed to 275 bp per our initial trimming step.
 
 Remove chimeras
 ```{r}
 seqtab.nochim <- removeBimeraDenovo(seqtab, method="consensus", multithread=TRUE, verbose=TRUE)
 dim(seqtab.nochim)
 ```
+
 
 We may decide at a later point that the step to remove chimeras actually removes relevant haplotypes.
 
@@ -172,8 +169,8 @@ We may decide at a later point that the step to remove chimeras actually removes
     asv_seqs=colnames(seqtab.nochim)
     for(i in 1:length(asv_seqs))
     {
-        write.table(paste(">ASV",i, sep=""),file="csv_outputs/HAPO_micro_20260324_ASV_fwd_275bp.csv", append=TRUE, col.names = F, row.names = F, quote=F)
-        write.table(paste(asv_seqs[i], sep=""),file="csv_outputs/HAPO_micro_20260324_ASV_fwd_275bp.csv", append=TRUE, col.names = F, row.names = F, quote=F)
+        write.table(paste(">ASV",i, sep=""),file="csv_outputs/HAPO_micro_20260324_ASV_rev_275bp.csv", append=TRUE, col.names = F, row.names = F, quote=F)
+        write.table(paste(asv_seqs[i], sep=""),file="csv_outputs/HAPO_micro_20260324_ASV_rev_275bp.csv", append=TRUE, col.names = F, row.names = F, quote=F)
     }
 ```
 
@@ -189,15 +186,10 @@ st.brief <- seqtab.nochim
 colnames(st.brief) <- names(briefToSeq)
 
 # export the pool seq table with brief names:
-write.csv(st.brief, file="csv_outputs/microkit_20260324_fwd_275_sampleTable.csv")
+write.csv(st.brief, file="csv_outputs/microkit_20260324_rev_sampleTable.csv")
+
 ```
 
-So a few things to consider:
-1) it might be worthwhile to create a custom reference database with harbor porpoise haplotypes for the "blastn" search
-
-
-
-I checked the first few ASVs on NCBI and they're all Phocoena phocoena, which is good. So let's treat the ASVs like data for a second.
 
 ## Sample info
 
@@ -217,37 +209,10 @@ long_df %>%
   ggplot(aes(x = sample, y = reads, fill = ASV)) +
   geom_bar(stat = "identity") +
   theme(
-    legend.position = "none",
+    #legend.position = "none",
     axis.text.x = element_text(angle = 90, size = 6)
   ) +
   scale_y_continuous(expand = c(0,0))
 
 # ggsave("pdf_outputs/microkit_20260324_quicklook.png", width = 10, height = 4)
 ```
-
-
-```{r}
-db <- read_csv("../data/Metadata_extraction_db_format.csv")
-
-
-#samples <- read_csv("csv_outputs/microkit_samples_20260324.csv")
-
-long_df %>%
-  separate(sample, into = c("extraction_ID", "replicate"), remove = F) %>%
-  left_join(., db) %>%
-  filter(reads > 0) %>%
-  mutate(sample_type = ifelse(is.na(sample_type), "positive_control", sample_type)) %>%
-  group_by(sample_type) %>%
-  filter(sample_type %in% c("sample", "positive_control")) %>%
-  ggplot(aes(x = sample, y = reads, fill = ASV)) +
-  geom_bar(stat = "identity") +
-  theme(
-    legend.position = "none",
-    axis.text.x = element_text(angle = 90, size = 6)
-  ) +
-  scale_y_continuous(expand = c(0,0))
-
-  
-  
-```
-
