@@ -11,6 +11,12 @@ knitr::opts_chunk$set(echo = TRUE)
 
 MiSeq run on 2026-04-13 using a 2x300 cycle kit.
 
+```{r load-libraries}
+library(dada2)
+library(tidyverse)
+
+```
+
 ```{sh, eval=F}
 # preliminaries to get cutadapt going
 (base) AKCJM140-DB23:cutadapt_mismatches diana.baetscher$ conda activate cutadaptenv
@@ -53,11 +59,6 @@ None, presently.
 ## Dada2 and ASV analysis
 
 Launching into the R-portion of the analysis in dada2
-
-```{r load-libraries}
-library(dada2)
-library(tidyverse)
-```
 
 ```{r}
 # file location
@@ -220,11 +221,20 @@ colnames(st.brief) <- names(briefToSeq)
 write.csv(st.brief, file="csv_outputs/hapo_20260413_sampleTable.csv")
 ```
 
+
+### JAMIE BEGIN HERE ###
+
+```{r read-in-data-outputs-from-dada2}
+sample_df <- read_csv("csv_outputs/hapo_20260413_sampleTable.csv") %>%
+  dplyr::rename(sample = `...1`)
+
+```
+
 ## Sample info
 
 ```{r asvs-in-samples}
-tmp <- as.data.frame(st.brief)
-sample_df <- rownames_to_column(tmp, var = "sample")
+#tmp <- as.data.frame(st.brief)
+#sample_df <- rownames_to_column(tmp, var = "sample")
 
 long_df <- sample_df %>%
   pivot_longer(2:length(sample_df)) %>%
@@ -251,6 +261,7 @@ Use the custom blast database on Sedna to assign haplotypes for these data.
 This was a little clunky for some reason...
 ```{sh, eval=F}
 blastn -db hapo_CR -query /home/dbaetscher/workdir/blast/HAPO_eDNA/hapo_20260413_ASV.csv -out CR_2025_results.txt -outfmt 6
+
 ```
 
 
