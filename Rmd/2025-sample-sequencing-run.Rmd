@@ -1,0 +1,313 @@
+---
+title: "2025-sample-sequencing-run"
+author: "diana baetscher"
+date: "2026-04-17"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+MiSeq run on 2026-04-13 using a 2x300 cycle kit.
+
+```{sh, eval=F}
+# preliminaries to get cutadapt going
+(base) AKCJM140-DB23:cutadapt_mismatches diana.baetscher$ conda activate cutadaptenv
+
+DATA=/Users/diana.baetscher/git-repos/HAPO/data/20260413_HAPOeDNA/rawdata
+
+# below, the first set of () creates an array, containing n elements of the desired trimmed and unique names
+NAMELIST=$(ls ${DATA} | sed 's/e*_L001.*//' | uniq)
+echo "${NAMELIST}"
+
+```
+
+
+```{sh, eval=F}
+# cutadapt remove primers
+# unlike in the previous microkit runs, here we have paired-end data that should include both the fwd and reverse primers
+# using the -b (anywhere adapter syntax fixed the issue)
+for i in ${NAMELIST}; do
+	cutadapt --discard-untrimmed -b TACTCCTTGAAAAAGCCCATTGTA -B ATGGTCCTGAAGTAAGAACCAGATG -o trimmed/${i}_R1.fastq.gz -p trimmed/${i}_R2.fastq.gz "$DATA/${i}_L001_R1_001.fastq.gz" "$DATA/${i}_L001_R2_001.fastq.gz" >> cutadapt_out.txt
+	done
+
+
+# then unzip the reads in the /trimmed directory
+pigz -d *gz
+```
+
+Notes about the "anywhere" adapter from Cutadapt docs:
+For this type of adapter, the sequence is specified with -b ADAPTER (or use the longer spelling --anywhere ADAPTER). The adapter may appear in the beginning (even degraded), within the read, or at the end of the read (even partially). The decision which part of the read to remove is made as follows: If there is at least one base before the found adapter, then the adapter is considered to be a 3’ adapter and the adapter itself and everything following it is removed. Otherwise, the adapter is considered to be a 5’ adapter and it is removed from the read, but the sequence after it remains.
+
+
+Are there empty files?
+If so, I should move them before they cause trouble:
+```{sh move-empty-files, eval = F}
+find /Users/diana.baetscher/git-repos/HAPO/data/20260413_HAPOeDNA/trimmed -type f -empty -exec mv {} /Users/diana.baetscher/git-repos/HAPO/data/20260413_HAPOeDNA/trimmed_empty/ \;
+
+```
+None, presently.
+
+
+## Dada2 and ASV analysis
+
+Launching into the R-portion of the analysis in dada2
+
+```{r load-libraries}
+library(dada2)
+library(tidyverse)
+```
+
+```{r}
+# file location
+path <- "../data/20260413_HAPOeDNA/trimmed"
+
+list.files(path)
+
+```
+
+
+```{r}
+# paired-end data
+fnFs <- sort(list.files(path, pattern = "_R1.fastq", full.names = TRUE))
+fnRs <- sort(list.files(path, pattern = "_R2.fastq", full.names = TRUE))
+# Extract sample names, assuming filenames have format: SAMPLENAME_XXX.fastq
+sample.names <- sapply(strsplit(basename(fnFs), "_"), `[`, 1)
+
+```
+
+
+```{r}
+plotQualityProfile(fnFs[1:3])
+plotQualityProfile(fnRs[1:3])
+
+
+```
+These are classic 600-cycle kit patterns, where the forward read is much higher quality at the later cycles than the reverse read. Consequently, let's trim to 250 in the FWD and 200 in the REV. That should still give us >20 bp of overlap.
+
+
+```{r}
+# Place filtered files in filtered/ subdirectory
+filtFs <- file.path(path, "filtered", paste0(sample.names, "_F_filt.fastq.gz"))
+filtRs <- file.path(path, "filtered", paste0(sample.names, "_R_filt.fastq.gz"))
+names(filtFs) <- sample.names
+names(filtRs) <- sample.names
+```
+
+
+
+Change truncLen to see how that affects downstream processing.
+```{r}
+out <- filterAndTrim(fnFs, filtFs, fnRs, filtRs, truncLen=c(250,200),
+              maxN=0, maxEE=c(2,4), truncQ=2, rm.phix=TRUE,
+              compress=TRUE, multithread=TRUE) 
+head(out)
+```
+
+
+### Error rates
+```{r}
+fwd_list <- as.list(filtFs)
+rev_list <- as.list(filtRs)
+
+new_list <- fwd_list[1:10] # smaller amount of data for learning the error rates.
+new_list2 <- rev_list[1:10]
+
+
+# fwd error rates
+errF <- learnErrors(new_list, multithread=TRUE)
+# reverse error rates
+errR <- learnErrors(new_list2, multithread=TRUE)
+0
+# plot the erors
+p1 <- plotErrors(errF, nominalQ=TRUE)
+p2 <- plotErrors(errR, nominalQ=TRUE)
+
+```
+
+
+### Sample inference
+
+```{r}
+# forwards
+dadaFs <- dada(filtFs, err=errF, multithread=TRUE)
+
+# reverses
+dadaRs <- dada(filtRs, err=errR, multithread=TRUE)
+
+```
+
+
+Merge paired end reads
+```{r}
+mergers <- mergePairs(dadaFs, filtFs, dadaRs, filtRs, verbose=TRUE)
+# Inspect the merger data.frame from the first sample
+head(mergers[[1]])
+```
+
+Make a sequence table
+```{r}
+seqtab <- makeSequenceTable(mergers)
+dim(seqtab)
+
+```
+
+
+```{r}
+# Inspect distribution of sequence lengths
+table(nchar(getSequences(seqtab)))
+```
+
+
+
+Let's remove the singletons and off-target sequences
+```{r}
+# this seems like the obvious size range
+# but if necessary, we can investigate different filtering options here
+seqtab2 <- seqtab[,nchar(colnames(seqtab)) %in% 401:403]
+
+```
+
+Remove chimeras
+```{r}
+seqtab.nochim <- removeBimeraDenovo(seqtab2, method="consensus", multithread=TRUE, verbose=TRUE)
+dim(seqtab.nochim)
+
+```
+This seems too high... come back to this as well!
+
+
+Calculate frequency of chimeras
+```{r}
+sum(seqtab.nochim)/sum(seqtab2)
+
+```
+
+Track reads through the pipeline
+```{r}
+getN <- function(x) sum(getUniques(x))
+track <- cbind(out, sapply(dadaFs, getN), sapply(dadaRs, getN), sapply(mergers, getN), rowSums(seqtab.nochim))
+
+colnames(track) <- c("input", "filtered", "denoisedF", "denoisedR", "merged", "nonchim")
+rownames(track) <- sample.names
+head(track)
+```
+## Export files for taxonomy and samples/ASVs
+
+```{r regseqs-asv-output}
+ #make fasta file with ASVs
+    asv_seqs=colnames(seqtab.nochim)
+    for(i in 1:length(asv_seqs))
+    {
+        write.table(paste(">ASV",i, sep=""),file="csv_outputs/hapo_20260413_ASV.csv", append=TRUE, col.names = F, row.names = F, quote=F)
+        write.table(paste(asv_seqs[i], sep=""),file="csv_outputs/hapo_20260413_ASV.csv", append=TRUE, col.names = F, row.names = F, quote=F)
+    }
+```
+
+That's the input for the FASTA blastn search.
+
+Make ASV headers correspond to those output in the FASTA file.
+```{r output-asv-table}
+# Make map between brief names and full sequences
+briefToSeq <- colnames(seqtab.nochim)
+names(briefToSeq) <- paste0("ASV", seq(ncol(seqtab.nochim))) # Seq1, Seq2, ...
+# Make new sequence table with brief names
+st.brief <- seqtab.nochim
+colnames(st.brief) <- names(briefToSeq)
+
+# export the pool seq table with brief names:
+write.csv(st.brief, file="csv_outputs/hapo_20260413_sampleTable.csv")
+```
+
+## Sample info
+
+```{r asvs-in-samples}
+tmp <- as.data.frame(st.brief)
+sample_df <- rownames_to_column(tmp, var = "sample")
+
+long_df <- sample_df %>%
+  pivot_longer(2:length(sample_df)) %>%
+  dplyr::rename(reads = value, ASV = name) 
+
+# long_df %>%
+#   write_csv("csv_outputs/microkit_samples_20260324.csv")
+
+long_df %>%
+  filter(reads > 1) %>% # pretty minimal read filter
+  ggplot(aes(x = sample, y = reads, fill = ASV)) +
+  geom_bar(stat = "identity") +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 90, size = 6)
+  ) +
+  scale_y_continuous(expand = c(0,0))
+
+# ggsave("pdf_outputs/microkit_20260324_quicklook.png", width = 10, height = 4)
+```
+
+Use the custom blast database on Sedna to assign haplotypes for these data.
+
+This was a little clunky for some reason...
+```{sh, eval=F}
+blastn -db hapo_CR -query /home/dbaetscher/workdir/blast/HAPO_eDNA/hapo_20260413_ASV.csv -out CR_2025_results.txt -outfmt 6
+```
+
+
+```{r read-in-the-custom-blast-results}
+blast_results <- read_tsv("../data/blast_outputs/CR_2025_results.txt", col_names = F) 
+blast_data <- blast_results %>%
+  dplyr::rename(ASV = X1, ref_id = X2, perc_id = X3, len = X4, mismatch = X5, gap = X6)
+
+top_hits <- blast_data %>%
+  group_by(ASV) %>%
+  slice_max(order_by = perc_id, n = 1, with_ties = T)
+
+```
+
+
+
+
+```{r}
+top_hits %>%
+  ggplot(aes(x = ref_id, y = ASV)) +
+  geom_tile() +
+  theme(
+    axis.text.x = element_text(angle = 90)
+  )
+
+```
+How many of the ASVs only match one CR?
+
+```{r}
+top_hits %>%
+  add_tally(name = "n_CR_seqs") %>%
+  filter(n_CR_seqs > 1)
+
+
+```
+43 ASVs that supposedly match more than one CR haplotype and 148 ASVs that only match a single CR haplotype.
+
+I could also be more stringent about mismatches.
+
+Look at it the other way, how many ASVs match a given CR haplotype
+
+```{r}
+long_df %>%
+  left_join(., top_hits) %>%
+  filter(reads > 1) %>%
+  select(ASV, ref_id, perc_id, mismatch) %>%
+  unique() %>%
+  filter(mismatch < 2) %>%
+  group_by(ref_id) %>%
+  #tally(name = "n_ASV") %>%
+  ggplot(aes(x = ref_id, y = ASV, fill = perc_id)) +
+  geom_tile() +
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(size = 8)
+  )
+
+ggsave("pdf_outputs/2025_samples_20260413.png", width = 8, height = 11)
+```
+
